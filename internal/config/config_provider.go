@@ -1,7 +1,7 @@
 // Copyright 2024 - offen.software <hioffen@posteo.de>
 // SPDX-License-Identifier: MPL-2.0
 
-package main
+package config
 
 import (
 	"bufio"
@@ -16,26 +16,26 @@ import (
 	shell "mvdan.cc/sh/v3/shell"
 )
 
-type configStrategy string
+type Strategy string
 
 const (
-	configStrategyEnv   configStrategy = "env"
-	configStrategyConfd configStrategy = "confd"
+	StrategyEnv   Strategy = "env"
+	StrategyConfd Strategy = "confd"
 )
 
 // sourceConfiguration returns a list of config objects using the given
 // strategy. It should be the single entrypoint for retrieving configuration
 // for all consumers.
-func sourceConfiguration(strategy configStrategy) ([]*Config, error) {
+func SourceConfiguration(strategy Strategy) ([]*Config, error) {
 	switch strategy {
-	case configStrategyEnv:
+	case StrategyEnv:
 		c, err := loadConfigFromEnvVars()
 		return []*Config{c}, err
-	case configStrategyConfd:
+	case StrategyConfd:
 		cs, err := loadConfigsFromEnvFiles("/etc/dockervolumebackup/conf.d")
 		if err != nil {
 			if os.IsNotExist(err) {
-				return sourceConfiguration(configStrategyEnv)
+				return SourceConfiguration(StrategyEnv)
 			}
 			return nil, errwrap.Wrap(err, "error loading config files")
 		}
@@ -83,7 +83,7 @@ func loadConfigFromEnvVars() (*Config, error) {
 	if err != nil {
 		return nil, errwrap.Wrap(err, "error loading config from environment")
 	}
-	c.source = "from environment"
+	c.Source = "from environment"
 	return c, nil
 }
 
@@ -117,7 +117,7 @@ func loadConfigsFromEnvFiles(directory string) ([]*Config, error) {
 		if err != nil {
 			return nil, errwrap.Wrap(err, fmt.Sprintf("error loading config from file %s", p))
 		}
-		c.source = item.Name()
+		c.Source = item.Name()
 		c.additionalEnvVars = envFile
 		configs = append(configs, c)
 	}

@@ -1,7 +1,7 @@
 // Copyright 2022 - offen.software <hioffen@posteo.de>
 // SPDX-License-Identifier: MPL-2.0
 
-package main
+package config
 
 import (
 	"crypto/x509"
@@ -83,7 +83,7 @@ type Config struct {
 	DropboxAppSecret              string          `split_words:"true"`
 	DropboxRemotePath             string          `split_words:"true"`
 	DropboxConcurrencyLevel       NaturalNumber   `split_words:"true" default:"6"`
-	source                        string
+	Source                        string
 	additionalEnvVars             map[string]string
 }
 
@@ -187,7 +187,7 @@ type envVarLookup struct {
 // applyEnv sets the values in `additionalEnvVars` as environment variables.
 // It returns a function that reverts all values that have been set to its
 // previous state.
-func (c *Config) applyEnv() (func() error, error) {
+func (c *Config) ApplyEnv() (func() error, error) {
 	lookups := []envVarLookup{}
 
 	unset := func() error {

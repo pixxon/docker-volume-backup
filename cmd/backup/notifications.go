@@ -14,6 +14,7 @@ import (
 	"time"
 
 	sTypes "github.com/containrrr/shoutrrr/pkg/types"
+	"github.com/offen/docker-volume-backup/internal/config"
 	"github.com/offen/docker-volume-backup/internal/errwrap"
 )
 
@@ -23,7 +24,7 @@ var defaultNotifications string
 // NotificationData data to be passed to the notification templates
 type NotificationData struct {
 	Error  error
-	Config *Config
+	Config *config.Config
 	Stats  *Stats
 }
 

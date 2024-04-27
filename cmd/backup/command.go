@@ -10,6 +10,7 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/offen/docker-volume-backup/internal/config"
 	"github.com/offen/docker-volume-backup/internal/errwrap"
 	"github.com/robfig/cron/v3"
 )
@@ -30,7 +31,7 @@ func newCommand() *command {
 // runAsCommand executes a backup run for each configuration that is available
 // and then returns
 func (c *command) runAsCommand() error {
-	configurations, err := sourceConfiguration(configStrategyEnv)
+	configurations, err := config.SourceConfiguration(config.StrategyEnv)
 	if err != nil {
 		return errwrap.Wrap(err, "error loading env vars")
 	}
@@ -59,7 +60,7 @@ func (c *command) runInForeground(opts foregroundOpts) error {
 		),
 	)
 
-	if err := c.schedule(configStrategyConfd); err != nil {
+	if err := c.schedule(config.StrategyConfd); err != nil {
 		return errwrap.Wrap(err, "error scheduling")
 	}
 
@@ -81,7 +82,7 @@ func (c *command) runInForeground(opts foregroundOpts) error {
 			<-ctx.Done()
 			return nil
 		case <-c.reload:
-			if err := c.schedule(configStrategyConfd); err != nil {
+			if err := c.schedule(config.StrategyConfd); err != nil {
 				return errwrap.Wrap(err, "error reloading configuration")
 			}
 		}
@@ -90,12 +91,12 @@ func (c *command) runInForeground(opts foregroundOpts) error {
 
 // schedule wipes all existing schedules and enqueues all schedules available
 // using the given configuration strategy
-func (c *command) schedule(strategy configStrategy) error {
+func (c *command) schedule(strategy config.Strategy) error {
 	for _, id := range c.schedules {
 		c.cr.Remove(id)
 	}
 
-	configurations, err := sourceConfiguration(strategy)
+	configurations, err := config.SourceConfiguration(strategy)
 	if err != nil {
 		return errwrap.Wrap(err, "error sourcing configuration")
 	}
@@ -126,7 +127,7 @@ func (c *command) schedule(strategy configStrategy) error {
 		if err != nil {
 			return errwrap.Wrap(err, fmt.Sprintf("error adding schedule %s", config.BackupCronExpression))
 		}
-		c.logger.Info(fmt.Sprintf("Successfully scheduled backup %s with expression %s", config.source, config.BackupCronExpression))
+		c.logger.Info(fmt.Sprintf("Successfully scheduled backup %s with expression %s", config.Source, config.BackupCronExpression))
 		if ok := checkCronSchedule(config.BackupCronExpression); !ok {
 			c.logger.Warn(
 				fmt.Sprintf("Scheduled cron expression %s will never run, is this intentional?", config.BackupCronExpression),

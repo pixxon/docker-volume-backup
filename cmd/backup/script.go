@@ -12,6 +12,7 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/offen/docker-volume-backup/internal/config"
 	"github.com/offen/docker-volume-backup/internal/errwrap"
 	"github.com/offen/docker-volume-backup/internal/storage"
 	"github.com/offen/docker-volume-backup/internal/storage/azure"
@@ -43,14 +44,14 @@ type script struct {
 
 	encounteredLock bool
 
-	c *Config
+	c *config.Config
 }
 
 // newScript creates all resources needed for the script to perform actions against
 // remote resources like the Docker engine or remote storage locations. All
 // reading from env vars or other configuration sources is expected to happen
 // in this method.
-func newScript(c *Config) *script {
+func newScript(c *config.Config) *script {
 	stdOut, logBuffer := buffer(os.Stdout)
 	return &script{
 		c:      c,

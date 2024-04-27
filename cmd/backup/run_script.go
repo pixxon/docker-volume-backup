@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"runtime/debug"
 
+	"github.com/offen/docker-volume-backup/internal/config"
 	"github.com/offen/docker-volume-backup/internal/errwrap"
 )
 
@@ -15,7 +16,7 @@ import (
 // To ensure it runs mutually exclusive a global file lock is acquired before
 // it starts running. Any panic within the script will be recovered and returned
 // as an error.
-func runScript(c *Config) (err error) {
+func runScript(c *config.Config) (err error) {
 	defer func() {
 		if derr := recover(); derr != nil {
 			fmt.Printf("%s: %s\n", derr, debug.Stack())
@@ -41,7 +42,7 @@ func runScript(c *Config) (err error) {
 		}
 	}()
 
-	unset, err := s.c.applyEnv()
+	unset, err := s.c.ApplyEnv()
 	if err != nil {
 		return errwrap.Wrap(err, "error applying env")
 	}
