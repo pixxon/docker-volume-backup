@@ -78,15 +78,6 @@ func loadConfig(lookup envProxy) (*Config, error) {
 	return c, nil
 }
 
-func loadConfigFromEnvVars() (*Config, error) {
-	c, err := loadConfig(os.LookupEnv)
-	if err != nil {
-		return nil, errwrap.Wrap(err, "error loading config from environment")
-	}
-	c.Source = "from environment"
-	return c, nil
-}
-
 func loadConfigsFromEnvFiles(directory string) ([]*Config, error) {
 	items, err := os.ReadDir(directory)
 	if err != nil {
@@ -118,7 +109,6 @@ func loadConfigsFromEnvFiles(directory string) ([]*Config, error) {
 			return nil, errwrap.Wrap(err, fmt.Sprintf("error loading config from file %s", p))
 		}
 		c.Source = item.Name()
-		c.additionalEnvVars = envFile
 		configs = append(configs, c)
 	}
 
