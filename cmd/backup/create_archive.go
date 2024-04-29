@@ -15,16 +15,16 @@ import (
 // createArchive creates a tar archive of the configured backup location and
 // saves it to disk.
 func (s *script) createArchive() error {
-	backupSources := s.c.BackupSources
+	backupSources := s.c.Backup.Sources
 
-	if s.c.BackupFromSnapshot {
+	if s.c.Backup.FromSnapshot {
 		s.logger.Warn(
 			"Using BACKUP_FROM_SNAPSHOT has been deprecated and will be removed in the next major version.",
 		)
 		s.logger.Warn(
 			"Please use `archive-pre` and `archive-post` commands to prepare your backup sources. Refer to the documentation for an upgrade guide.",
 		)
-		backupSources = filepath.Join("/tmp", s.c.BackupSources)
+		backupSources = filepath.Join("/tmp", s.c.Backup.Sources)
 		// copy before compressing guard against a situation where backup folder's content are still growing.
 		s.registerHook(hookLevelPlumbing, func(error) error {
 			if err := remove(backupSources); err != nil {
@@ -35,14 +35,14 @@ func (s *script) createArchive() error {
 			)
 			return nil
 		})
-		if err := copy.Copy(s.c.BackupSources, backupSources, copy.Options{
+		if err := copy.Copy(s.c.Backup.Sources, backupSources, copy.Options{
 			PreserveTimes: true,
 			PreserveOwner: true,
 		}); err != nil {
 			return errwrap.Wrap(err, "error creating snapshot")
 		}
 		s.logger.Info(
-			fmt.Sprintf("Created snapshot of `%s` at `%s`.", s.c.BackupSources, backupSources),
+			fmt.Sprintf("Created snapshot of `%s` at `%s`.", s.c.Backup.Sources, backupSources),
 		)
 	}
 
@@ -68,7 +68,7 @@ func (s *script) createArchive() error {
 			return err
 		}
 
-		if s.c.BackupExcludeRegexp.Re != nil && s.c.BackupExcludeRegexp.Re.MatchString(path) {
+		if s.c.Backup.ExcludeRegexp.Re != nil && s.c.Backup.ExcludeRegexp.Re.MatchString(path) {
 			return nil
 		}
 		filesEligibleForBackup = append(filesEligibleForBackup, path)
@@ -77,7 +77,7 @@ func (s *script) createArchive() error {
 		return errwrap.Wrap(err, "error walking filesystem tree")
 	}
 
-	if err := createArchive(filesEligibleForBackup, backupSources, tarFile, s.c.BackupCompression.String(), s.c.GzipParallelism.Int()); err != nil {
+	if err := createArchive(filesEligibleForBackup, backupSources, tarFile, s.c.Backup.Compression.String(), s.c.Backup.GzipParallelism.Int()); err != nil {
 		return errwrap.Wrap(err, "error compressing backup folder")
 	}
 

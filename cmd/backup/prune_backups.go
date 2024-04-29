@@ -17,23 +17,23 @@ import (
 // the given configuration. In case the given configuration would delete all
 // backups, it does nothing instead and logs a warning.
 func (s *script) pruneBackups() error {
-	if s.c.BackupRetentionDays < 0 {
+	if s.c.Backup.RetentionDays < 0 {
 		return nil
 	}
 
-	deadline := time.Now().AddDate(0, 0, -int(s.c.BackupRetentionDays)).Add(s.c.BackupPruningLeeway)
+	deadline := time.Now().AddDate(0, 0, -int(s.c.Backup.RetentionDays)).Add(s.c.Backup.PruningLeeway)
 
 	eg := errgroup.Group{}
 	for _, backend := range s.storages {
 		b := backend
 		eg.Go(func() error {
-			if skipPrune(b.Name(), s.c.BackupSkipBackendsFromPrune) {
+			if skipPrune(b.Name(), s.c.Backup.SkipBackendsFromPrune) {
 				s.logger.Info(
 					fmt.Sprintf("Skipping pruning for backend `%s`.", b.Name()),
 				)
 				return nil
 			}
-			stats, err := b.Prune(deadline, s.c.BackupPruningPrefix)
+			stats, err := b.Prune(deadline, s.c.Backup.PruningPrefix)
 			if err != nil {
 				return err
 			}

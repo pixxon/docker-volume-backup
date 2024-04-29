@@ -42,7 +42,7 @@ func runScript(c *config.Config) (err error) {
 		}
 	}()
 
-	unset, err := s.c.ApplyEnv()
+	unset, err := config.ApplyEnv()
 	if err != nil {
 		return errwrap.Wrap(err, "error applying env")
 	}

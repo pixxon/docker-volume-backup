@@ -78,7 +78,7 @@ func (s *script) init() error {
 		return nil
 	})
 
-	s.file = path.Join("/tmp", s.c.BackupFilename)
+	s.file = path.Join("/tmp", s.c.Backup.Filename)
 
 	tmplFileName, tErr := template.New("extension").Parse(s.file)
 	if tErr != nil {
@@ -87,16 +87,16 @@ func (s *script) init() error {
 
 	var bf bytes.Buffer
 	if tErr := tmplFileName.Execute(&bf, map[string]string{
-		"Extension": fmt.Sprintf("tar.%s", s.c.BackupCompression),
+		"Extension": fmt.Sprintf("tar.%s", s.c.Backup.Compression),
 	}); tErr != nil {
 		return errwrap.Wrap(tErr, "error executing backup file extension template")
 	}
 	s.file = bf.String()
 
-	if s.c.BackupFilenameExpand {
+	if s.c.Backup.FilenameExpand {
 		s.file = os.ExpandEnv(s.file)
-		s.c.BackupLatestSymlink = os.ExpandEnv(s.c.BackupLatestSymlink)
-		s.c.BackupPruningPrefix = os.ExpandEnv(s.c.BackupPruningPrefix)
+		s.c.Backup.LatestSymlink = os.ExpandEnv(s.c.Backup.LatestSymlink)
+		s.c.Backup.PruningPrefix = os.ExpandEnv(s.c.Backup.PruningPrefix)
 	}
 	s.file = timeutil.Strftime(&s.stats.StartTime, s.file)
 
@@ -125,112 +125,66 @@ func (s *script) init() error {
 		}
 	}
 
-	if s.c.AwsS3BucketName != "" {
-		s3Config := s3.Config{
-			Endpoint:         s.c.AwsEndpoint,
-			AccessKeyID:      s.c.AwsAccessKeyID,
-			SecretAccessKey:  s.c.AwsSecretAccessKey,
-			IamRoleEndpoint:  s.c.AwsIamRoleEndpoint,
-			EndpointProto:    s.c.AwsEndpointProto,
-			EndpointInsecure: s.c.AwsEndpointInsecure,
-			RemotePath:       s.c.AwsS3Path,
-			BucketName:       s.c.AwsS3BucketName,
-			StorageClass:     s.c.AwsStorageClass,
-			CACert:           s.c.AwsEndpointCACert.Cert,
-			PartSize:         s.c.AwsPartSize,
-		}
-		s3Backend, err := s3.NewStorageBackend(s3Config, logFunc)
+	if s.c.Storage.AWS != nil {
+		s3Backend, err := s3.NewStorageBackend(*s.c.Storage.AWS, logFunc)
 		if err != nil {
 			return errwrap.Wrap(err, "error creating s3 storage backend")
 		}
 		s.storages = append(s.storages, s3Backend)
 	}
 
-	if s.c.WebdavUrl != "" {
-		webDavConfig := webdav.Config{
-			URL:         s.c.WebdavUrl,
-			URLInsecure: s.c.WebdavUrlInsecure,
-			Username:    s.c.WebdavUsername,
-			Password:    s.c.WebdavPassword,
-			RemotePath:  s.c.WebdavPath,
-		}
-		webdavBackend, err := webdav.NewStorageBackend(webDavConfig, logFunc)
+	if s.c.Storage.Webdav != nil {
+		webdavBackend, err := webdav.NewStorageBackend(*s.c.Storage.Webdav, logFunc)
 		if err != nil {
 			return errwrap.Wrap(err, "error creating webdav storage backend")
 		}
 		s.storages = append(s.storages, webdavBackend)
 	}
 
-	if s.c.SSHHostName != "" {
-		sshConfig := ssh.Config{
-			HostName:           s.c.SSHHostName,
-			Port:               s.c.SSHPort,
-			User:               s.c.SSHUser,
-			Password:           s.c.SSHPassword,
-			IdentityFile:       s.c.SSHIdentityFile,
-			IdentityPassphrase: s.c.SSHIdentityPassphrase,
-			RemotePath:         s.c.SSHRemotePath,
-		}
-		sshBackend, err := ssh.NewStorageBackend(sshConfig, logFunc)
+	if s.c.Storage.SSH != nil {
+		sshBackend, err := ssh.NewStorageBackend(*s.c.Storage.SSH, logFunc)
 		if err != nil {
 			return errwrap.Wrap(err, "error creating ssh storage backend")
 		}
 		s.storages = append(s.storages, sshBackend)
 	}
 
-	if _, err := os.Stat(s.c.BackupArchive); !os.IsNotExist(err) {
+	if _, err := os.Stat(s.c.Backup.Archive); !os.IsNotExist(err) {
 		localConfig := local.Config{
-			ArchivePath:   s.c.BackupArchive,
-			LatestSymlink: s.c.BackupLatestSymlink,
+			ArchivePath:   s.c.Backup.Archive,
+			LatestSymlink: s.c.Backup.LatestSymlink,
 		}
 		localBackend := local.NewStorageBackend(localConfig, logFunc)
 		s.storages = append(s.storages, localBackend)
 	}
 
-	if s.c.AzureStorageAccountName != "" {
-		azureConfig := azure.Config{
-			ContainerName:     s.c.AzureStorageContainerName,
-			AccountName:       s.c.AzureStorageAccountName,
-			PrimaryAccountKey: s.c.AzureStoragePrimaryAccountKey,
-			Endpoint:          s.c.AzureStorageEndpoint,
-			RemotePath:        s.c.AzureStoragePath,
-			ConnectionString:  s.c.AzureStorageConnectionString,
-		}
-		azureBackend, err := azure.NewStorageBackend(azureConfig, logFunc)
+	if s.c.Storage.Azure != nil {
+		azureBackend, err := azure.NewStorageBackend(*s.c.Storage.Azure, logFunc)
 		if err != nil {
 			return errwrap.Wrap(err, "error creating azure storage backend")
 		}
 		s.storages = append(s.storages, azureBackend)
 	}
 
-	if s.c.DropboxRefreshToken != "" && s.c.DropboxAppKey != "" && s.c.DropboxAppSecret != "" {
-		dropboxConfig := dropbox.Config{
-			Endpoint:         s.c.DropboxEndpoint,
-			OAuth2Endpoint:   s.c.DropboxOAuth2Endpoint,
-			RefreshToken:     s.c.DropboxRefreshToken,
-			AppKey:           s.c.DropboxAppKey,
-			AppSecret:        s.c.DropboxAppSecret,
-			RemotePath:       s.c.DropboxRemotePath,
-			ConcurrencyLevel: s.c.DropboxConcurrencyLevel.Int(),
-		}
-		dropboxBackend, err := dropbox.NewStorageBackend(dropboxConfig, logFunc)
+	if s.c.Storage.Dropbox != nil {
+		dropboxBackend, err := dropbox.NewStorageBackend(*s.c.Storage.Dropbox, logFunc)
 		if err != nil {
 			return errwrap.Wrap(err, "error creating dropbox storage backend")
 		}
 		s.storages = append(s.storages, dropboxBackend)
 	}
 
-	if s.c.EmailNotificationRecipient != "" {
+	if s.c.Notification.Email != nil {
 		emailURL := fmt.Sprintf(
 			"smtp://%s:%s@%s:%d/?from=%s&to=%s",
-			s.c.EmailSMTPUsername,
-			s.c.EmailSMTPPassword,
-			s.c.EmailSMTPHost,
-			s.c.EmailSMTPPort,
-			s.c.EmailNotificationSender,
-			s.c.EmailNotificationRecipient,
+			s.c.Notification.Email.EmailSMTPUsername,
+			s.c.Notification.Email.EmailSMTPPassword,
+			s.c.Notification.Email.EmailSMTPHost,
+			s.c.Notification.Email.EmailSMTPPort,
+			s.c.Notification.Email.EmailNotificationSender,
+			s.c.Notification.Email.EmailNotificationRecipient,
 		)
-		s.c.NotificationURLs = append(s.c.NotificationURLs, emailURL)
+		s.c.Notification.NotificationURLs = append(s.c.Notification.NotificationURLs, emailURL)
 		s.logger.Warn(
 			"Using EMAIL_* keys for providing notification configuration has been deprecated and will be removed in the next major version.",
 		)
@@ -239,14 +193,14 @@ func (s *script) init() error {
 		)
 	}
 
-	hookLevel, ok := hookLevels[s.c.NotificationLevel]
+	hookLevel, ok := hookLevels[s.c.Notification.Level]
 	if !ok {
-		return errwrap.Wrap(nil, fmt.Sprintf("unknown NOTIFICATION_LEVEL %s", s.c.NotificationLevel))
+		return errwrap.Wrap(nil, fmt.Sprintf("unknown NOTIFICATION_LEVEL %s", s.c.Notification.Level))
 	}
 	s.hookLevel = hookLevel
 
-	if len(s.c.NotificationURLs) > 0 {
-		sender, senderErr := shoutrrr.CreateSender(s.c.NotificationURLs...)
+	if len(s.c.Notification.NotificationURLs) > 0 {
+		sender, senderErr := shoutrrr.CreateSender(s.c.Notification.NotificationURLs...)
 		if senderErr != nil {
 			return errwrap.Wrap(senderErr, "error creating sender")
 		}

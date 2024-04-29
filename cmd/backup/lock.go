@@ -23,7 +23,7 @@ func (s *script) lock(lockfile string) (func() error, error) {
 
 	retry := time.NewTicker(5 * time.Second)
 	defer retry.Stop()
-	deadline := time.NewTimer(s.c.LockTimeout)
+	deadline := time.NewTimer(s.c.Backup.LockTimeout)
 	defer deadline.Stop()
 
 	fileLock := flock.New(lockfile)
@@ -44,7 +44,7 @@ func (s *script) lock(lockfile string) (func() error, error) {
 			s.logger.Info(
 				fmt.Sprintf(
 					"Exclusive lock was not available on first attempt. Will retry until it becomes available or the timeout of %s is exceeded.",
-					s.c.LockTimeout,
+					s.c.Backup.LockTimeout,
 				),
 			)
 			s.encounteredLock = true

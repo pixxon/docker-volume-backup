@@ -104,8 +104,8 @@ func (s *script) stopContainersAndServices() (func() error, error) {
 		return noop, errwrap.Wrap(err, "error determining swarm state")
 	}
 
-	labelValue := s.c.BackupStopDuringBackupLabel
-	if s.c.BackupStopContainerLabel != "" {
+	labelValue := s.c.Backup.StopDuringBackupLabel
+	if s.c.Backup.StopContainerLabel != "" {
 		s.logger.Warn(
 			"Using BACKUP_STOP_CONTAINER_LABEL has been deprecated and will be removed in the next major version.",
 		)
@@ -115,7 +115,7 @@ func (s *script) stopContainersAndServices() (func() error, error) {
 		if _, ok := os.LookupEnv("BACKUP_STOP_DURING_BACKUP_LABEL"); ok {
 			return noop, errwrap.Wrap(nil, "both BACKUP_STOP_DURING_BACKUP_LABEL and BACKUP_STOP_CONTAINER_LABEL have been set, cannot continue")
 		}
-		labelValue = s.c.BackupStopContainerLabel
+		labelValue = s.c.Backup.StopContainerLabel
 	}
 
 	filterMatchLabel := fmt.Sprintf(
@@ -245,7 +245,7 @@ func (s *script) stopContainersAndServices() (func() error, error) {
 				}
 				// progress.ServiceProgress returns too early, so we need to manually check
 				// whether all containers belonging to the service have actually been removed
-				if err := awaitContainerCountForService(s.cli, svc.serviceID, 0, s.c.BackupStopServiceTimeout); err != nil {
+				if err := awaitContainerCountForService(s.cli, svc.serviceID, 0, s.c.Backup.StopServiceTimeout); err != nil {
 					scaleDownErrors.append(err)
 				}
 			}(svc)

@@ -17,7 +17,7 @@ import (
 // In case no passphrase is given it returns early, leaving the backup file
 // untouched.
 func (s *script) encryptArchive() error {
-	if s.c.GpgPassphrase == "" {
+	if s.c.Backup.GpgPassphrase == "" {
 		return nil
 	}
 
@@ -39,7 +39,7 @@ func (s *script) encryptArchive() error {
 	defer outFile.Close()
 
 	_, name := path.Split(s.file)
-	dst, err := openpgp.SymmetricallyEncrypt(outFile, []byte(s.c.GpgPassphrase), &openpgp.FileHints{
+	dst, err := openpgp.SymmetricallyEncrypt(outFile, []byte(s.c.Backup.GpgPassphrase), &openpgp.FileHints{
 		FileName: name,
 	}, nil)
 	if err != nil {

@@ -103,11 +103,11 @@ func (c *command) schedule(strategy config.Strategy) error {
 
 	for _, cfg := range configurations {
 		config := cfg
-		id, err := c.cr.AddFunc(config.BackupCronExpression, func() {
+		id, err := c.cr.AddFunc(config.Backup.CronExpression, func() {
 			c.logger.Info(
 				fmt.Sprintf(
 					"Now running script on schedule %s",
-					config.BackupCronExpression,
+					config.Backup.CronExpression,
 				),
 			)
 
@@ -115,7 +115,7 @@ func (c *command) schedule(strategy config.Strategy) error {
 				c.logger.Error(
 					fmt.Sprintf(
 						"Unexpected error running schedule %s: %v",
-						config.BackupCronExpression,
+						config.Backup.CronExpression,
 						errwrap.Unwrap(err),
 					),
 					"error",
@@ -125,12 +125,12 @@ func (c *command) schedule(strategy config.Strategy) error {
 		})
 
 		if err != nil {
-			return errwrap.Wrap(err, fmt.Sprintf("error adding schedule %s", config.BackupCronExpression))
+			return errwrap.Wrap(err, fmt.Sprintf("error adding schedule %s", config.Backup.CronExpression))
 		}
-		c.logger.Info(fmt.Sprintf("Successfully scheduled backup %s with expression %s", config.Source, config.BackupCronExpression))
-		if ok := checkCronSchedule(config.BackupCronExpression); !ok {
+		c.logger.Info(fmt.Sprintf("Successfully scheduled backup %s with expression %s", config.Source, config.Backup.CronExpression))
+		if ok := checkCronSchedule(config.Backup.CronExpression); !ok {
 			c.logger.Warn(
-				fmt.Sprintf("Scheduled cron expression %s will never run, is this intentional?", config.BackupCronExpression),
+				fmt.Sprintf("Scheduled cron expression %s will never run, is this intentional?", config.Backup.CronExpression),
 			)
 
 			if err != nil {

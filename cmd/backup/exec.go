@@ -90,10 +90,10 @@ func (s *script) runLabeledCommands(label string) error {
 	f := []filters.KeyValuePair{
 		{Key: "label", Value: label},
 	}
-	if s.c.ExecLabel != "" {
+	if s.c.Backup.ExecLabel != "" {
 		f = append(f, filters.KeyValuePair{
 			Key:   "label",
-			Value: fmt.Sprintf("docker-volume-backup.exec-label=%s", s.c.ExecLabel),
+			Value: fmt.Sprintf("docker-volume-backup.exec-label=%s", s.c.Backup.ExecLabel),
 		})
 	}
 	containersWithCommand, err := s.cli.ContainerList(context.Background(), types.ContainerListOptions{
@@ -168,7 +168,7 @@ func (s *script) runLabeledCommands(label string) error {
 
 			s.logger.Info(fmt.Sprintf("Running %s command %s for container %s", label, cmd, strings.TrimPrefix(c.Names[0], "/")))
 			stdout, stderr, err := s.exec(c.ID, cmd, user)
-			if s.c.ExecForwardOutput {
+			if s.c.Backup.ExecForwardOutput {
 				os.Stderr.Write(stderr)
 				os.Stdout.Write(stdout)
 			}
