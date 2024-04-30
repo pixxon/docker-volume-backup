@@ -16,7 +16,7 @@ import (
 
 type command struct {
 	logger    *slog.Logger
-	schedules []cron.EntryID
+	schedules map[configStrategy][]cron.EntryID
 	cr        *cron.Cron
 	reload    chan struct{}
 }
@@ -24,20 +24,42 @@ type command struct {
 func newCommand() *command {
 	return &command{
 		logger: slog.New(slog.NewTextHandler(os.Stdout, nil)),
+		schedules: map[configStrategy][]cron.EntryID{
+			configStrategyEnv:   {},
+			configStrategyConfd: {},
+			configStrategyLabel: {},
+		},
 	}
 }
 
 // runAsCommand executes a backup run for each configuration that is available
 // and then returns
-func (c *command) runAsCommand() error {
+func (c *command) runAsCommand(opts commandOpts) error {
 	configurations, err := sourceConfiguration(configStrategyEnv)
 	if err != nil {
 		return errwrap.Wrap(err, "error loading env vars")
 	}
 
 	for _, config := range configurations {
-		if err := runScript(config); err != nil {
-			return errwrap.Wrap(err, "error running script")
+		if config.source == opts.source {
+			if err := runScript(config); err != nil {
+				return errwrap.Wrap(err, "error running script")
+			}
+			return nil
+		}
+	}
+
+	configurations, err = sourceConfiguration(configStrategyLabel)
+	if err != nil {
+		return errwrap.Wrap(err, "error loading labels")
+	}
+
+	for _, config := range configurations {
+		if config.source == opts.source {
+			if err := runProxy(config); err != nil {
+				return errwrap.Wrap(err, "error running script")
+			}
+			return nil
 		}
 	}
 
@@ -46,6 +68,10 @@ func (c *command) runAsCommand() error {
 
 type foregroundOpts struct {
 	profileCronExpression string
+}
+
+type commandOpts struct {
+	source string
 }
 
 // runInForeground starts the program as a long running process, scheduling
@@ -59,7 +85,11 @@ func (c *command) runInForeground(opts foregroundOpts) error {
 		),
 	)
 
-	if err := c.schedule(configStrategyConfd); err != nil {
+	if err := c.scheduleConfd(); err != nil {
+		return errwrap.Wrap(err, "error scheduling")
+	}
+
+	if err := c.scheduleLabel(); err != nil {
 		return errwrap.Wrap(err, "error scheduling")
 	}
 
@@ -81,7 +111,10 @@ func (c *command) runInForeground(opts foregroundOpts) error {
 			<-ctx.Done()
 			return nil
 		case <-c.reload:
-			if err := c.schedule(configStrategyConfd); err != nil {
+			if err := c.scheduleConfd(); err != nil {
+				return errwrap.Wrap(err, "error reloading configuration")
+			}
+			if err := c.scheduleLabel(); err != nil {
 				return errwrap.Wrap(err, "error reloading configuration")
 			}
 		}
@@ -90,12 +123,12 @@ func (c *command) runInForeground(opts foregroundOpts) error {
 
 // schedule wipes all existing schedules and enqueues all schedules available
 // using the given configuration strategy
-func (c *command) schedule(strategy configStrategy) error {
-	for _, id := range c.schedules {
+func (c *command) scheduleConfd() error {
+	for _, id := range c.schedules[configStrategyConfd] {
 		c.cr.Remove(id)
 	}
 
-	configurations, err := sourceConfiguration(strategy)
+	configurations, err := sourceConfiguration(configStrategyConfd)
 	if err != nil {
 		return errwrap.Wrap(err, "error sourcing configuration")
 	}
@@ -131,12 +164,56 @@ func (c *command) schedule(strategy configStrategy) error {
 			c.logger.Warn(
 				fmt.Sprintf("Scheduled cron expression %s will never run, is this intentional?", config.BackupCronExpression),
 			)
-
-			if err != nil {
-				return errwrap.Wrap(err, "error scheduling")
-			}
-			c.schedules = append(c.schedules, id)
+			c.schedules[configStrategyConfd] = append(c.schedules[configStrategyConfd], id)
 		}
+	}
+
+	return nil
+}
+
+func (c *command) scheduleLabel() error {
+	for _, id := range c.schedules[configStrategyLabel] {
+		c.cr.Remove(id)
+	}
+
+	configurations, err := sourceConfiguration(configStrategyLabel)
+	if err != nil {
+		return errwrap.Wrap(err, "error sourcing configuration")
+	}
+
+	for _, cfg := range configurations {
+		if ok := checkCronSchedule(cfg.BackupCronExpression); !ok {
+			c.logger.Warn(
+				fmt.Sprintf("Scheduled cron expression %s will never run, is this intentional?", cfg.BackupCronExpression),
+			)
+		}
+
+		id, err := c.cr.AddFunc(cfg.BackupCronExpression, func() {
+			c.logger.Info(
+				fmt.Sprintf(
+					"Now running script on schedule %s",
+					cfg.BackupCronExpression,
+				),
+			)
+
+			if err := runProxy(cfg); err != nil {
+				c.logger.Error(
+					fmt.Sprintf(
+						"Unexpected error running schedule %s: %v",
+						cfg.BackupCronExpression,
+						errwrap.Unwrap(err),
+					),
+					"error",
+					err,
+				)
+			}
+		})
+		if err != nil {
+			return errwrap.Wrap(err, fmt.Sprintf("error adding schedule %s", cfg.BackupCronExpression))
+		}
+
+		c.logger.Info(fmt.Sprintf("Successfully scheduled backup %s with expression %s", cfg.source, cfg.BackupCronExpression))
+		c.schedules[configStrategyConfd] = append(c.schedules[configStrategyConfd], id)
 	}
 
 	return nil

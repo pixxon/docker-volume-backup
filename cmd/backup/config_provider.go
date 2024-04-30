@@ -5,14 +5,19 @@ package main
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 
+	"github.com/docker/docker/api/types/filters"
+	"github.com/docker/docker/api/types/volume"
+	"github.com/docker/docker/client"
 	"github.com/joho/godotenv"
 	"github.com/offen/docker-volume-backup/internal/errwrap"
 	"github.com/offen/envconfig"
+	"github.com/traefik/paerser/parser"
 	shell "mvdan.cc/sh/v3/shell"
 )
 
@@ -21,6 +26,7 @@ type configStrategy string
 const (
 	configStrategyEnv   configStrategy = "env"
 	configStrategyConfd configStrategy = "confd"
+	configStrategyLabel configStrategy = "label"
 )
 
 // sourceConfiguration returns a list of config objects using the given
@@ -39,6 +45,19 @@ func sourceConfiguration(strategy configStrategy) ([]*Config, error) {
 			}
 			return nil, errwrap.Wrap(err, "error loading config files")
 		}
+		return cs, nil
+	case configStrategyLabel:
+		cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+		if err != nil {
+			return nil, errwrap.Wrap(err, "failed to create docker client")
+		}
+		defer cli.Close()
+
+		cs, err := loadConfigsFromLabels(cli)
+		if err != nil {
+			return nil, errwrap.Wrap(err, "error loading configs from labels")
+		}
+
 		return cs, nil
 	default:
 		return nil, errwrap.Wrap(nil, fmt.Sprintf("received unknown config strategy: %v", strategy))
@@ -120,6 +139,36 @@ func loadConfigsFromEnvFiles(directory string) ([]*Config, error) {
 		c.source = item.Name()
 		c.additionalEnvVars = envFile
 		configs = append(configs, c)
+	}
+
+	return configs, nil
+}
+
+func loadConfigsFromLabels(cli *client.Client) ([]*Config, error) {
+	filter := filters.NewArgs(
+		filters.KeyValuePair{
+			Key:   "label",
+			Value: "docker-volume-backup.enabled=true",
+		},
+	)
+	volresp, err := cli.VolumeList(context.Background(), volume.ListOptions{Filters: filter})
+	if err != nil {
+		return nil, errwrap.Wrap(err, "failed to list volumes")
+	}
+
+	configs := []*Config{}
+	for _, vol := range volresp.Volumes {
+		config := &Config{}
+
+		config.NotificationLevel = "error"
+
+		err = parser.Decode(vol.Labels, config, "docker-volume-backup", "docker-volume-backup")
+		if err != nil {
+			return nil, errwrap.Wrap(err, fmt.Sprintf("failed to decode config from labels of volume %s", vol.Name))
+		}
+		config.source = vol.Name
+
+		configs = append(configs, config)
 	}
 
 	return configs, nil

@@ -1,0 +1,47 @@
+version: '3'
+
+services:
+  minio:
+    image: minio/minio:RELEASE.2020-08-04T23-10-51Z
+    environment:
+      MINIO_ROOT_USER: test
+      MINIO_ROOT_PASSWORD: test
+      MINIO_ACCESS_KEY: test
+      MINIO_SECRET_KEY: GMusLtUmILge2by+z890kQ
+    entrypoint: /bin/ash -c 'mkdir -p /data/backup && minio server /data'
+    volumes:
+      - minio_backup_data:/data
+
+  backup:
+    image: offen/docker-volume-backup:${TEST_VERSION:-canary}
+    hostname: hostnametoken
+    depends_on:
+      - minio
+    restart: always
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+
+  offen:
+    image: offen/offen:latest
+    labels:
+      - docker-volume-backup.stop-during-backup=true
+    volumes:
+      - app_data:/var/opt/offen
+
+volumes:
+  minio_backup_data:
+    name: minio_backup_data
+  app_data:
+    labels:
+      docker-volume-backup.enabled: 'true'
+      docker-volume-backup.awsaccesskeyid: test
+      docker-volume-backup.awssecretaccesskey: GMusLtUmILge2by+z890kQ
+      docker-volume-backup.awsendpoint: minio:9000
+      docker-volume-backup.awsendpointproto: http
+      docker-volume-backup.awss3bucketname: backup
+      docker-volume-backup.backupfilenameexpand: 'true'
+      docker-volume-backup.backupfilename: test-$$HOSTNAME.tar.gz
+      docker-volume-backup.backupcronexpression: 0 0 5 31 2 ?
+      docker-volume-backup.backupretentiondays: ${BACKUP_RETENTION_DAYS:-7}
+      docker-volume-backup.backuppruningleeway: 5s
+      docker-volume-backup.backuppruningprefix: test

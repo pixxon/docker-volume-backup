@@ -18,6 +18,7 @@ import (
 // Config holds all configuration values that are expected to be set
 // by users.
 type Config struct {
+	Enabled                       bool
 	AwsS3BucketName               string          `split_words:"true"`
 	AwsS3Path                     string          `split_words:"true"`
 	AwsEndpoint                   string          `split_words:"true" default:"s3.amazonaws.com"`

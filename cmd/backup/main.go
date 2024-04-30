@@ -9,6 +9,7 @@ import (
 
 func main() {
 	foreground := flag.Bool("foreground", false, "run the tool in the foreground")
+	source := flag.String("source", "from environment", "source of backup to execute in command mode")
 	profile := flag.String("profile", "", "collect runtime metrics and log them periodically on the given cron expression")
 	flag.Parse()
 
@@ -19,6 +20,9 @@ func main() {
 		}
 		c.must(c.runInForeground(opts))
 	} else {
-		c.must(c.runAsCommand())
+		opts := commandOpts{
+			source: *source,
+		}
+		c.must(c.runAsCommand(opts))
 	}
 }
